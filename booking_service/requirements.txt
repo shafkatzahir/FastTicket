@@ -22,3 +22,4 @@ bcrypt==3.2.2
 
 fastapi-limiter
 redis>=4.2.0
+aiokafka

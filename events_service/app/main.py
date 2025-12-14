@@ -1,34 +1,56 @@
-import asyncio
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .database import engine
 from . import models
-from .routers import events_router # Import the correct router
+from .routers import events_router
 import redis.asyncio as redis
 from fastapi_limiter import FastAPILimiter
 from .config import settings
-from fastapi.middleware.cors import CORSMiddleware
+
+# --- NEW IMPORT ---
+from .kafka_consumer import consume_booking_events
 
 logger = logging.getLogger("events_service")
 
-# Create tables in events_db
+# Create tables
 models.Base.metadata.create_all(bind=engine)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Events Service starting up...")
+
+    # 1. Start Redis
+    redis_client = None
     try:
-        redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8")
+        redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         await FastAPILimiter.init(redis_client)
-        logger.info("FastAPILimiter initialized.")
     except Exception as e:
         logger.error(f"Failed to initialize FastAPILimiter: {e}")
+
+    # 2. Start Kafka Consumer (Background Task) --- NEW SECTION ---
+    consumer_task = asyncio.create_task(consume_booking_events())
+    logger.info("Kafka Consumer task initiated.")
+    # -----------------------------------------------------------
 
     yield
 
     logger.info("Events Service shutting down...")
-    await redis_client.close()
+
+    # 3. Graceful Shutdown --- NEW SECTION ---
+    consumer_task.cancel()
+    try:
+        await consumer_task
+    except asyncio.CancelledError:
+        logger.info("Kafka Consumer task cancelled.")
+    # ----------------------------------------
+
+    if redis_client:
+        await redis_client.close()
+
 
 app = FastAPI(title="Events Service API", version="1.0.0", lifespan=lifespan)
 
@@ -41,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(events_router.router)
+
 
 @app.get("/")
 def read_root():

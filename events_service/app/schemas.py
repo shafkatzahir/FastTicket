@@ -17,6 +17,7 @@ class EventRead(EventBase):
     id: int
     tickets_sold: int
     created_at: datetime
+    available_tickets: int
 
     class Config:
         from_attributes = True

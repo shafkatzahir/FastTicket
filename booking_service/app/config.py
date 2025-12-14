@@ -8,9 +8,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int
     REDIS_URL: str
 
-    # --- NEW KAFKA SETTINGS ---
+    # --- KAFKA SETTINGS ---
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
-    KAFKA_PROPERTY_TOPIC: str = "property_updates"
+    KAFKA_BOOKING_TOPIC: str = "booking_events"
+    KAFKA_CONFIRMATION_TOPIC: str = "booking_confirmations"
 
     model_config = SettingsConfigDict(env_file="../../booking-service/.env",extra="ignore")
 
