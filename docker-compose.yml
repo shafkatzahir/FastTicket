@@ -1,4 +1,4 @@
-version: '3.8'
+#version: '3.8'
 
 services:
   # --- Infrastructure ---
@@ -47,8 +47,9 @@ services:
   # --- Microservices ---
   auth_service:
     build: ./auth_service
-    ports:
-      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+#    ports:
+#      - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/auth_db
       SECRET_KEY: ${SECRET_KEY}
@@ -64,8 +65,11 @@ services:
 
   events_service:
     build: ./events_service
-    ports:
-      - "8001:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    deploy:
+      replicas: 2
+#    ports:
+#      - "8001:8000"
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/events_db
       SECRET_KEY: ${SECRET_KEY}
@@ -83,8 +87,9 @@ services:
 
   booking_service:
     build: ./booking_service
-    ports:
-      - "8002:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+#    ports:
+#      - "8002:8000"
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/booking_db
       SECRET_KEY: ${SECRET_KEY}
@@ -137,6 +142,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+    # --- NEW: API GATEWAY ---
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80" # The only door open to the public
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth_service
+      - events_service
+      - booking_service
+    networks:
+      - fastticket_network
 
 volumes:
   postgres_data:
